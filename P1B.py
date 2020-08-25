@@ -5,7 +5,7 @@ from scipy import integrate
 
 L = 10**(-6)    # Length of box (m)
 T = 3*10**3     # Temperature of gas (K)
-N = 100 000       # amt of particles
+N = 10**5       # amt of particles
 
 part_pos = np.zeros((N, N, 3))
 part_vel = np.zeros((N, N, 3))
