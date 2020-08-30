@@ -1,4 +1,13 @@
 # EGEN KODE
+import ast2000tools.utils as utils
+
+seed = utils.get_seed('alinerb')
+
+from ast2000tools.solar_system import SolarSystem
+
+system = SolarSystem(seed)
+
+
 
 import numpy as np
 
@@ -12,3 +21,8 @@ Thrust =
 Fuel_Consumption =
 Speed_Boost =
 '''
+
+from ast2000tools.space_mission import SpaceMission
+mission = SpaceMission(seed)
+
+print(mission.spacecraft_mass)
