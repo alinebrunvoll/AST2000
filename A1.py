@@ -6,13 +6,16 @@ import matplotlib.pyplot as plt
 
 def P(a, b, my, sigma):
     f = lambda x: (1 /(np.sqrt(2*np.pi)*sigma)) * np.exp(-0.5 *((x-my)/sigma)**2)
-    return integrate.quad(f, a, b)[0]
+    return integrate.quad(f, a, b)[0]  # Integrerer sannsynlighetstettheten fra a til b
 
-
+# Printer ut sannsynligheten for at et tiilfeldig tall er innenfor standardavviket sigma
 print(P(-1, 1, 0, 1))
 print(P(-2, 2, 0, 1))
 print(P(-3, 3, 0, 1))
 
+'''
+GJØR DETTE!
+'''
 # assert FWHM = 2 * sigma * np.sqrt(2*log(2))
 
 
@@ -29,9 +32,16 @@ plt.ylabel('Sannsynlighet')
 plt.show()
 
 
+'''
+GJØR DETTE!
+'''
 print(P(5, 30, 0, 1)* N)
 
 
+
+'''
+SE MER PÅ DENNE!
+'''
 v = np.linspace(0, 3, N)
 plt.plot(v, f(v))
 plt.show()

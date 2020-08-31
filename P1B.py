@@ -35,4 +35,6 @@ def motion():
 
     return part_pos
 
+for i, j, k in enumerate()
+
 print(motion())
