@@ -2,15 +2,18 @@
 
 import numpy as np
 from scipy import integrate
+from sympy import Derivative
 from numba import njit
 import ast2000tools.utils as utils
+import time
 # seed = utils.get_seed('XXX')
 # 99586
+k = 1.38 * 10**(-23)    # Boltzmann-konstanten
+m = 2*1.66*10**(-27)    # Mass of hydrogen molecule (kg)
+M = 1100
 
-
+@njit
 def combustionchamber(L, T, N, iterations):
-    k = 1.38 * 10**(-23)
-    m = 1.67*10**(-27)
     part_pos = np.zeros((iterations, N, 3))
     part_vel = np.zeros((iterations, N, 3))
 
@@ -24,33 +27,45 @@ def combustionchamber(L, T, N, iterations):
         part_pos[0] = init_pos
         part_vel[0] = init_vel
 
-        def particles():
-            for i in range(iterations):
-                for j in range(N):
-                    for k in range(3):
-                        if part_pos[i][j][k] <= 0 or part_pos[i][j][k] >= L :
-                            part_vel[i][j][k] = - part_vel[i][j][k]
-                     # newvel = np.where(np.abs(part_pos[i,j]) >= L/2, -1, 1)
-                     # part_vel[i,j] *= newvel
+
+        for i in range(iterations):
+            for j in range(N):
+                for k in range(3):
+                    if part_pos[i][j][k] <= 0 or part_pos[i][j][k] >= L :
+                        part_vel[i][j][k] = - part_vel[i][j][k]
+
+
         # Integrating the array with time elements, where each element has N positional vectors in 3 dimentions.
-                part_pos[i] = part_pos[i-1] + dt*part_vel[0]
-        particles()
-
+            part_pos[i] = part_pos[i-1] + dt*part_vel[0]
+        p_part = 0
         count = 0
+        thrust_force = 0
+        for i in range(iterations):
+            for j in range(N):
+                for k in range(3):
+                     if part_pos[i, j, 2] <= 0 and np.abs(part_pos[i, j, 0]) < 0.25*L and np.abs(part_pos[i, j, 1]) < 0.25*L:
 
-        if part_pos[i, j, 2] == 0 and np.abs(part_pos[:, :, 0:1]) < 0.25*L:
-            count += 1
+                        p_part += m*np.abs(part_vel[i, j, 2])
+                        count += 1
+                        part_pos[i, j, 2] = L
 
-        # hole = np.where(part_pos[:, :, 2] = 0 and np.abs(part_pos[:, :, 0]) < 0.25*L and np.abs(part_pos[:, :, 1]) < 0.25*L, True, None)
-        # count.append(hole)
-        return part_pos
 
+        return part_pos, p_part, count
     return motion()
+
+
 
 
 L = 10**(-6)        # Length of box (m)
 T = 3*10**3         # Temperature of gas (K)
 N = 10**5           # amt of particles
-iterations = 10    # time
+iterations = 1000   # iterasjons
 
-print(combustionchamber(L, T, N, iterations))
+part_pos, p_part, count = combustionchamber(L, T, N, iterations)
+
+fuel_consumption = count * m   # kg
+thrust_force = p_part / 10**(-9)
+
+
+def fuelconsumed(thrust_force, fuel_consumption, m_rocket, fuel_mass):
+    speed_boost = p_part / (M + fuel_mass - fuel_consumption)
