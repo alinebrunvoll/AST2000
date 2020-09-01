@@ -69,3 +69,7 @@ thrust_force = p_part / 10**(-9)
 
 def fuelconsumed(thrust_force, fuel_consumption, m_rocket, fuel_mass):
     speed_boost = p_part / (M + fuel_mass - fuel_consumption)
+    
+# Vi burde lage en array for delta_v m komponenter i x-y-z-retning! Da kan vi styre raketten senere i oppgavene!!!! 
+# Og så kan vi bare ta abs(delta_v)...?
+# Ja. 
