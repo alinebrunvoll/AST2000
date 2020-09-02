@@ -67,5 +67,12 @@ fuel_consumption = count * m   # kg
 thrust_force = p_part / 10**(-9)
 
 
-def fuelconsumed(thrust_force, fuel_consumption, m_rocket, fuel_mass):
-    speed_boost = p_part / (M + fuel_mass - fuel_consumption)
+def fuelconsumed(thrust_force, fuel_consumption, m_rocket, fuel_mass, amt_boxes, delta_v, time, iterations):
+    dt = time/iterations
+
+
+
+
+
+
+fuelconsumed(thrust_force, fuel_consumption, 1100, 100, xxx, )
