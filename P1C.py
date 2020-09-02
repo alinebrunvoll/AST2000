@@ -6,11 +6,14 @@ from sympy import Derivative
 from numba import njit
 import ast2000tools.utils as utils
 import time
+
 # seed = utils.get_seed('XXX')
 # 99586
+
 k = 1.38 * 10**(-23)    # Boltzmann-konstanten
 m = 2*1.66*10**(-27)    # Mass of hydrogen molecule (kg)
 M = 1100
+
 
 @njit
 def combustionchamber(L, T, N, iterations):
@@ -47,7 +50,7 @@ def combustionchamber(L, T, N, iterations):
                         count += 1
                         part_pos[i, j, 2] = L
 
-        return part_pos, p_part, count
+        return p_part, count
     return motion()
 
 
@@ -62,19 +65,17 @@ def fuelconsumed(thrust_force, fuel_consumption, fuel_mass, delta_v):
 
 # print(fuelconsumed(thrust_force, fuel_consumption, 1100, 1))
 
-
-
-
-
-L = 10**(-6)        # Length of box (m)
+L = 10**(-3)        # Length of box (m)
 T = 3*10**3         # Temperature of gas (K)
-N = 10**5           # amt of particles
+N = 10**6           # amt of particles
+
+
 
 @njit
 def rocket_launch(T, L, N, fuel_mass, amt_boxes, iterations):
     v_esc = 9097.12           # unnslippningshastighet (m/s)
 
-    part_pos, p_part, count = combustionchamber(L, T, N, iterations)
+    p_part, count =  combustionchamber(L, T, N, 1000)
     fuel_consumption = count * m * amt_boxes                          # kg
     thrust_force = (p_part / 10**(-9) ) * amt_boxes                   # N
 
@@ -82,19 +83,19 @@ def rocket_launch(T, L, N, fuel_mass, amt_boxes, iterations):
     r = np.zeros(iterations)
     t = np.zeros(iterations)
     mass = np.zeros(iterations)
-    dt = 0.01
+    dt = 5
 
     v[0] = 0
     r[0] = 0
     t[0] = 0
     mass[0] = M + fuel_mass
 
-
     for i in range(iterations):
-        while v[i] < v_esc:
-            a = (thrust_force + v[i]*(mass[i+1] - mass[i])) / mass[0]
-            v[i] = v[i-1] + a*dt
-            r[i] = r[i-1] + v[i]*dt
-            t[i] = t[i-1] + dt
+        a = (thrust_force + v[i]*(mass[i+1] - mass[i])) / mass[0]
+        v[i] = v[i-1] + a*dt
+        r[i] = r[i-1] + v[i]*dt
+        t[i] = t[i-1] + dt
 
-print(rocket_launch(T, L, N, 20*1100, 10*12, 500))
+    return v[-1]
+
+print(rocket_launch(T, L, N, 20*1100, 10*12, 1000))
