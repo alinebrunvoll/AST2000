@@ -8,12 +8,19 @@ import numpy as np
 from scipy import integrate
 from sympy import Derivative
 from numba import njit
+import ast2000tools.constants as const
 import ast2000tools.utils as utils
 import time
+from ast2000tools.shortcuts import SpaceMissionShortcuts
+from ast2000tools.space_mission import SpaceMission
+seed = utils.get_seed('alinerb')
+mission = SpaceMission(seed)
+shortcuts = SpaceMissionShortcuts(mission, [74952])
 
 
 k = 1.38 * 10**(-23)                                      # Boltzmann-konstanten
-m = 2*1.66*10**(-27)                                      # Mass of hydrogen molecule (kg)
+# m = 2*1.66*10**(-27)                                      # Mass of hydrogen molecule (kg)
+m = const.m_H2
 M = 1100
 
 
@@ -86,12 +93,20 @@ def rocket_launch(T, L, N, fuel_mass, amt_boxes, dt):
         v_esc = np.sqrt( (2*gamma*M_planet)/(R+r) )
         i += 1
 
-    return print(f'Masse:{mass}, Tid (minutter): {t/60}, Posisjon: {r}, Fart: {v}')
-
+    # return print(f'Masse:{mass}, Tid (minutter): {t/60}, Posisjon: {r}, Fart: {v}')
+    return thrust_force, fuel_consumption, fuel_mass, t
 
 L = 10**(-7)        # Length of box (m)
 T = 3*10**3         # Temperature of gas (K)
 N = 10**5           # amt of particles
 
-print(rocket_launch(T, L, N, 15*1000, 10**18,  1))
-print(time.process_time())
+thrust_force, fuel_consumption, fuel_mass, t = rocket_launch(T, L, N, 15*1000, 10**18,  1)
+
+# Koden er 74952.
+print(shortcuts)
+
+mission.set_launch_parameters(thrust_force, fuel_consumption, fuel_mass, t, (0, 0), 0)
+mission.launch_rocket()
+consumed_fuel_mass, final_time, final_position, final_velocity = shortcuts.get_launch_results()
+mission.verify_launch_result(final_position)
+# print(time.process_time())

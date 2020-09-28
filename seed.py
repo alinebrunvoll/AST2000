@@ -17,6 +17,4 @@ for planet_idx in range(system.number_of_planets):
     print('Planet {:d} is a {} planet with a semi-major axis of {:g} AU.'
           .format(planet_idx, system.types[planet_idx], system.semi_major_axes[planet_idx]))
 
-
-
 print(system.print_info())
