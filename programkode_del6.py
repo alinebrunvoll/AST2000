@@ -1,6 +1,6 @@
 # Egen kode
 '''
-Noe om hva koden gjør
+This program calculates how hot and dense we... I mean the atmosphere is.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,19 +12,14 @@ from ast2000tools.solar_system import SolarSystem
 from ast2000tools.shortcuts import SpaceMissionShortcuts
 from numba import njit
 import time
-from programkode_del4_klasse import did_you_just_assume_my_orientation, launching_sequence
+
 seed = utils.get_seed('alinerb')
 mission = SpaceMission(seed)
-launch = launching_sequence(mission)
-orient = did_you_just_assume_my_orientation(mission)
+
 k = const.k_B
 c = 299792458
 m_H = const.m_H2/2
 
-
-timesteps = np.load('times.npy')
-planet_positions = np.load('planet_positions.npy')
-pos_planet = interpolate.interp1d(timesteps, planet_positions, axis = 0, bounds_error = False, fill_value = "extrapolate")
 
 def read_the_files():
     spectrum_file = open('spectrum_seed64_600nm_3000nm.txt', 'r')
@@ -77,7 +72,7 @@ def model_func(areas_of_interest_i, lambda_0, sigma, F_min):
 # @njit
 def Xi_squared(delta_lambda_max_i, areas_of_interest_i, m_part_i, lambda_ideal_i, F_of_interest_i, sigma_of_interest_i):
     c = 299792458     # m/s
-    k = const.k_B
+    k_B = const.k_B
     lambda_0 = np.linspace(lambda_ideal_i - delta_lambda_max_i, lambda_ideal_i + delta_lambda_max_i, 20)
     sigma = np.linspace(lambda_ideal_i/c * np.sqrt(k*150/m_part_i), lambda_ideal_i/c * np.sqrt(k*450/m_part_i), 20)
     F_min = np.linspace(0.7, 1, 20)
@@ -104,14 +99,14 @@ areas_of_interest, F_of_interest, sigma_of_interest, delta_lambda_max, lambda_id
 m_part = [2.6566962e-26, 2.6566962e-26, 2.6566962e-26, 2.988e-26, 2.988e-26, 2.988e-26, 7.3065e-26, 7.3065e-26, 2.66e-26, 2.66e-26, 9.7860872e-26, 7.30637e-26]           # kg
 name = ['Oksygen ved bølgelengden 632nm', 'Oksygen ved bølgelengden 690nm', 'Oksygen ved bølgelengden 760nm', 'Vann ved bølgelengden 720nm', 'Vann ved bølgelengden 820nm', 'Vann', 'Karbondioksid', 'Karbondioksid', 'CH4', 'CH4', 'CO', 'N2O']
 
-mean_molecular_weight = (m_part[0] + m_part[3] + m_part[6] + m_part[10])/(4*m_H)
+mean_molecular_weight = 0.25*(m_part[0] + m_part[3] + m_part[6] + m_part[10])/(m_H)
+print(f'mean molecular weight: {mean_molecular_weight}')
+
 
 
 # for i in range(len(areas_of_interest)):
 #     lambda_0_best, sigma_best, F_min_best = Xi_squared(delta_lambda_max[i], areas_of_interest[i], m_part[i], lambda_ideal[i], F_of_interest[i], sigma_of_interest[i])
 #     T = m_part[i] * sigma_best**2 * c**2 /(k*lambda_ideal[i]**2)
-#     v_r = lambda_ideal[i]*c/lambda_0_best # ehhhh nooo
-#     print(v_r)
 #
 #     plt.plot(areas_of_interest[i], F_of_interest[i])
 #     # plt.plot(areas_of_interest[i], model_func(areas_of_interest[i], lambda_0_best, sigma_best, F_min_best))
@@ -121,64 +116,71 @@ mean_molecular_weight = (m_part[0] + m_part[3] + m_part[6] + m_part[10])/(4*m_H)
 #     plt.show()
 
 
-
 # Froderias overflatetemperatur = 215K!
 
 def atmosphere_model(heights, mean_molecular_weight, number_of_steps):
     gamma = 1.4
     G = const.G
-    k = const.k_B
+    k_B = const.k_B
     m_H = const.m_H2/2
 
     # Using the code from part 3
     distance = mission.system.semi_major_axes[3]*const.AU/1000
     T_0 = mission.system.star_temperature*(mission.system.star_radius**2/(4*distance**2))**(1/4)
 
+    # Defining empty arrays for T, rho and P
     T = np.zeros([len(heights)])
     rho = np.zeros([len(heights)])
     P = np.zeros([len(heights)])
 
+    # Setting initial conditions
     T[0] = T_0
     rho[0] = mission.system.atmospheric_densities[3]
     M = mission.system.masses[3] * const.m_sun
     P[0] = rho[0]*k*T[0]/(mean_molecular_weight*m_H)
 
-    delta_r = (heights[-1]-mission.system.radii[3])/number_of_steps
+
+    delta_r = (heights[1]-heights[0])
+
+    # Calculating constant C:
     C = P[0]**(1-gamma) * T[0]**gamma
+
+    print(f'KONSTANT C: {C}')
+
 
     for i in range(len(heights)-1):
 
         g = G*M/heights[i]**2
         P[i+1] = P[i] + (-rho[i]*g)*delta_r
 
-        if T[i] >= T_0/2:
+        if T[i] > T_0/2:
             T[i+1] = C**(1/gamma) * P[i+1]**(1-(1/gamma))
         else:
             T[i+1] = T_0/2
 
-        rho[i+1] = (P[i+1]*mean_molecular_weight*m_H)/(k*T[i+1])
+        rho[i+1] = (P[i+1]*mean_molecular_weight*m_H)/(k_B*T[i+1])
 
 
     return rho, T
-print(mission.system.radii[3])
-print(2*np.pi/mission.system.rotational_periods[3]*24*60)
+#print(mission.system.radii[3])
+#print(2*np.pi/mission.system.rotational_periods[3]*24*60)
 number_of_steps = 1000000
-heights = np.linspace(mission.system.radii[3]*1000, 8000*1000, number_of_steps)
+heights = np.linspace(mission.system.radii[3]*1000, 100000+mission.system.radii[3]*1000, number_of_steps)
 rho, T = atmosphere_model(heights, mean_molecular_weight, number_of_steps)
-print(T)
-print(rho)
 
-plt.plot(T, heights, label = 'Temperatur')
+fig1 = plt.figure()
+plt.plot(T, heights, 'r', label = 'Temperatur')
+plt.xlabel('Temperatur [K]')
+plt.ylabel('Høyde [m]')
+plt.title('Temperatur i Froderias atmosfære')
 plt.legend()
-plt.show()
 
+fig2 = plt.figure()
 plt.plot(rho, heights, label = 'Atmosfæretetthet')
+plt.xlabel('Tetthet [kg/m^3]')
+plt.ylabel('Høyde [m]')
+plt.title('Froderias atmosfæretetthet')
 plt.legend()
 plt.show()
-
-
-
-
-
 
 print(f'The time to run: {time.process_time()} s')
