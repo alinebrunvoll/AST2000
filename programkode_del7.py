@@ -1,6 +1,6 @@
 # Egen kode
 '''
-We are going on a trip in our favorite rocket ship
+This code lets us down...
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,67 +10,74 @@ import ast2000tools.utils as utils
 from ast2000tools.space_mission import SpaceMission
 from ast2000tools.solar_system import SolarSystem
 from ast2000tools.shortcuts import SpaceMissionShortcuts
-from programkode_del4_klasse import did_you_just_assume_my_orientation, launching_sequence
+from numba import njit
+
 seed = utils.get_seed('alinerb')
 mission = SpaceMission(seed)
-launch = launching_sequence(mission)
-orient = did_you_just_assume_my_orientation(mission)
+
 
 # Disse lagret vi fra forrige del!
 rho_array = np.load('rho.npy')
 heights_array = np.load('heights.npy')
-
+# Interpolating atmosphere density:
 rho = interpolate.interp1d(heights_array, rho_array, axis = 0, bounds_error = False, fill_value = "extrapolate")
 
+# Defining constants:
+G = const.G
+M = mission.system.masses[3] * const.m_sun
+m = mission.lander_mass
+rho_0 = mission.system.atmospheric_densities[3]
+rot_vel = 2*np.pi/(mission.system.rotational_periods[3]*24*60*60)
+A = mission.lander_area
+R = mission.system.radii[3]*1000
+v_safe = 3
+
+# Calculating terminal velocity and area needed for parachute:
+v_terminal = np.sqrt( 2 * G * 90 * M/(R**2 * rho_0 * A) )
+Chute_area = 2 * G * 90 * M / (R**2 * rho_0 * 3**2)
+#print(f'Terminal velocity: {v_terminal} m/s')
+#print(f'The area we need the parachute to be: {Chute_area} m³')
 
 
-def air_resistance(A, heights, v):
-    rot_period = 2*np.pi*mission.system.radii[3]*1000/(mission.system.rotational_periods[3]*24*60*60)
-    C_d = 1
-
-    w = np.zeros([len(heights)])
-    F_d = np.zeros([len(heights)])
-
-    for i in range(len(heights)):
-        w[i] = rot_period*heights[i]
-        v_drag = v - w
-
-        F_d = 1/2 * rho * C_d * A *v_drag**2
-
-        # BURDE VI INTERPOLERE??
-    return F_d
-
+#@njit
 def simulating_landing(init_time, init_pos, init_vel, simulation_time, dt):
-
-    G = const.G
-    M = mission.system.masses[3] * const.m_sun
-    m = mission.lander_mass
-    rho_0 = mission.system.atmospheric_densities[3]
-    rot_period = 2*np.pi*mission.system.radii[3]*1000/(mission.system.rotational_periods[3]*24*60*60)
-    A = mission.lander_area
 
     N = int(simulation_time/dt)
     vel = np.zeros([N, 2])
     pos = np.zeros([N, 2])
     t = np.zeros([N])
+    A = mission.lander_area
 
     vel[0] = init_vel
     pos[0] = init_pos
     t[0] = init_time
 
+    chute = 0; thrust = 0
+    thrust_point = 0; chute_point = 0; land_point = 0
+
+    # Integration loop
     for i in range(N-1):
 
         e_r = pos[i]/np.linalg.norm(pos[i])
         e_theta =  np.array([-e_r[1], e_r[0]])
 
-        g = - G*M/np.linalg.norm(pos[i])**2
-        w = rot_period*np.linalg.norm(pos[i]) * e_theta
+        g = G*M/np.linalg.norm(pos[i])**2
+        w = rot_vel*np.linalg.norm(pos[i]) * e_theta
         v_drag = vel[i] - w
 
-        # F_L = 1/2 * rho_0 * A *(v_t**2 - v_safe**2)    if test og greier
-        F_d = 1/2 * rho(np.linalg.norm(pos[i])) * A * np.linalg.norm(v_drag)**2 * (-vel[i]/np.linalg.norm(vel[i]))
-        F_g = m*g * e_r
-        F_tot = F_d + F_g
+        F_d = 1/2 * rho(np.linalg.norm(pos[i])) * A * np.linalg.norm(v_drag)**2 * (-v_drag/np.linalg.norm(v_drag))
+        F_g = - m*g * e_r
+        F_L = 1/2 * rho_0 * A *(v_terminal**2 - v_safe**2) * (e_r)
+
+        # Landing Thruster:
+        if np.linalg.norm(pos[i]) <= (R + 200):
+            F_tot = F_d + F_g + F_L
+            if thrust == 0:
+                print('Landing thrusters activated\n')
+                thrust_point = pos[i]
+                thrust = 1
+        else:
+            F_tot = F_d + F_g
 
         a = F_tot/m
 
@@ -78,47 +85,62 @@ def simulating_landing(init_time, init_pos, init_vel, simulation_time, dt):
         pos[i+1] = pos[i] + vel[i+1]*dt
         t[i+1] = t[i] + dt
 
-        if np.linalg.norm(pos[i]) < mission.system.radii[3]*1000:
-            print('Oh no! You crashed!')
-            exit()
+        # Hvis vi krasjer i planeten:
+        if np.linalg.norm(pos[i]) <= R:
+            print('Touchdown!\n')
+            if np.linalg.norm(vel[i]) > 3:
+                print('You crashed though...\n')
+            land_point = pos[i]
+
+        # Hvis vi brenner opp i atmosfæren:
+        if np.linalg.norm(F_d) > (10**7 * A):
+            print('Sorry... Your lander just couldn\'t handle the pressure...\n')
+
+        # Fallskjerm:
+        if np.linalg.norm(pos[i]) <= R + 100000:
+            A = mission.lander_area + Chute_area
+            if chute == 0:
+                chute_point = pos[i]
+                print('\nParachute deployed\n')
+                chute = 1
+            # Hvis fallskjermen ryker:
+            if np.linalg.norm(F_d) > 250000:
+                print('Oh, chute! Looks like your parachute was caught by the wind...\n')
+
+    return pos, vel, t, chute_point, thrust_point, land_point
 
 
-    return pos, vel, t
-
-# These are the kartesian coordinates printet out form another program
+# These are the cartesian coordinates printed out from another program:
 init_time = 100000
-init_pos = (-1102189.44814319, -4155404.97443974)
-init_vel = (-3825.8392273, 1014.78067287)
+init_pos = (4127634.61920073, 1202017.45199339)
+init_vel = (-1106.69123521,  3800.27100878)
 
-simulation_time = 60*60*100
-dt = 1
-
-# pos_rocket, vel_rocket, t_rocket = simulating_landing(init_time, init_pos, init_vel, simulation_time, dt)
-
+# Unit vectors:
 e_r = init_pos/np.linalg.norm(init_pos)
-e_theta =  np.array([-e_r[1], e_r[0]])
+e_theta = np.array([-e_r[1], e_r[0]])
 
-init_vel = (-3825.8392273, 1014.78067287)+(e_theta*(100))
+# Simulation:
+simulation_time = 60*60*3.18
+dt = 0.01
+init_vel = init_vel - (e_theta*(75))
+pos, vel, t, chute_point, thrust_point, land_point = simulating_landing(init_time, init_pos, init_vel, simulation_time, dt)
 
-pos, vel, t = simulating_landing(init_time, init_pos, init_vel, simulation_time, dt)
-
-# simulation_time = 60*60
-# dt = 0.001
-# pos_, vel_, t_ = simulating_landing(t[-1], pos[-1], vel[-1], simulation_time, dt)
-
+# Plotting planet radius:
 theta = np.linspace(0, 2*np.pi, 100)
 radius = mission.system.radii[3]*1000
 figure, axes = plt.subplots(1)
-axes.plot(radius*np.cos(theta), radius*np.sin(theta))
+axes.plot(radius*np.cos(theta), radius*np.sin(theta), label='Froderia radius')
 
-plt.plot(pos[:, 0], pos[:, 1])
-# plt.plot(pos_[:, 0], pos_[:, 1])
-# plt.plot(pos_rocket[:, 0], pos_rocket[:, 1])
+# Plotting lander position:
+plt.plot(pos[:, 0], pos[:, 1],label='Landingsmodul')
 plt.axis('equal')
+plt.title('Landing')
+plt.xlabel('Avstand [m]')
+plt.ylabel('Avstand [m]')
+plt.legend()
+'''
+# Plotting parachute deployment, thruster activation and landing position:
+plt.plot(chute_point[0], chute_point[1], 'bH', label='Fallskjerm utløst')
+plt.plot(thrust_point[0], thrust_point[1], 'b^', label='Thruster aktivert')
+plt.plot(land_point[0], land_point[1], 'r*', label='Touchdown')'''
 plt.show()
-
-v_terminal = np.sqrt(2*const.G*90*mission.system.masses[3]*const.m_sun/((mission.system.radii[3]*1000)**2*mission.system.atmospheric_densities[3]* mission.lander_area))
-print(f'Terminal velocity: {v_terminal} m/s')
-
-area = 2*const.G*90*mission.system.masses[3]*const.m_sun/((mission.system.radii[3]*1000)**2*mission.system.atmospheric_densities[3]* 3**2)
-print(f'The area we need the parachute to be: {area} m³')
